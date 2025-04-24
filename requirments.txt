@@ -1,0 +1,25 @@
+# Required libraries for reinforcement learning and environment setup
+brax==0.0.12
+jax==0.4.30
+jaxlib==0.4.30
+
+# Neural network library
+flax==0.6.3
+
+# Optimizer library for gradient descent and policy updates
+optax==0.1.4
+
+# For plotting and visualizing training and results
+matplotlib==3.7.1
+numpy==1.24.2
+scipy==1.10.1
+pickle5==0.0.11
+
+# For reinforcement learning environment interface
+dm_env==1.1.0
+gym==0.26.2
+
+# For working with images and saving plots
+pillow==9.5.0
+
+
