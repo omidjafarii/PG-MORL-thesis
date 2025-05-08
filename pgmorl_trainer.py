@@ -44,7 +44,7 @@ class ActorCritic(nn.Module):
         for size in self.hidden_layer_sizes:
             critic = nn.Dense(size)(critic)
             critic = nn.tanh(critic)
-        critic = nn.Dense(3)(critic)  # 3-dimensional value for 3 objectives
+        critic = nn.Dense(2)(critic)  # 2-dimensional value for 2 objectives
         
         return actor_mean, actor_logstd, critic
 
@@ -57,7 +57,7 @@ def make_morl_env(env_name: str, batch_size: int, episode_length: int, action_re
     env = mywrappers.AutoResetWrapper(env)
     return env
 
-def sample_weights(n_samples: int, n_objectives: int = 3) -> jnp.ndarray:
+def sample_weights(n_samples: int, n_objectives: int = 2) -> jnp.ndarray:
     """Sample weights from a simplex for the scalarization."""
     weights = np.random.dirichlet(np.ones(n_objectives), size=n_samples)
     return jnp.array(weights)
@@ -81,7 +81,7 @@ class PGMORLTrainer:
                  num_updates_per_batch: int = 4,
                  discounting: float = 0.99,
                  seed: int = 0,
-                 num_objectives: int = 3):
+                 num_objectives: int = 2):
         
         # Initialize hyperparameters and environment settings
         self.num_timesteps = num_timesteps
@@ -398,7 +398,7 @@ class PGMORLTrainer:
 class ParetoArchive:
     """Archive to store Pareto optimal policies."""
     
-    def __init__(self, num_objectives=3, epsilon=0.01):
+    def __init__(self, num_objectives=2, epsilon=0.01):
         self.policies = []  # List of (params, returns) tuples
         self.returns = []   # List of return vectors
         self.num_objectives = num_objectives

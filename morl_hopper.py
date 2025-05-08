@@ -50,61 +50,60 @@ class MorlHopper(BaseHopper):
 """
         # Create a temporary XML file to store the custom environment definition
         with tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False) as f:
-            f.write(xml_content)  # Writing XML content to file
-            xml_path = f.name  # Store the path of the temporary file
-        
-        print(f"Using custom XML file: {xml_path}")  # Printing the file path for debugging
-        
-        # Remove 'xml_path' from kwargs if it's included to avoid passing it to the parent class
+            f.write(xml_content)
+            xml_path = f.name
+
+        print(f"Using custom XML file: {xml_path}")
+
         if 'xml_path' in kwargs:
             del kwargs['xml_path']
-        
-        # Initializing the parent class with the remaining arguments
+
+        # Initialize the parent Hopper environment
         super().__init__(**kwargs)
-        
-        # Setting the default MORL weights for the reward calculation (this could be adjusted later)
-        self.weights = jnp.array([1.0, 0.0, 0.0])  # Default weights for forward velocity, control cost, and alive bonus
-        
+
+        # Set the default weights for the MORL scalarization: [speed_weight, energy_weight]
+        self.weights = jnp.array([1.0, 0.0])  # Only 2 objectives used
+
     def reset(self, rng) -> State:
-        # Resetting the environment using the parent class's reset method
+        # Reset the environment using the parent reset method
         state = super().reset(rng)
-        
-        # Adding a zero-initialized reward_vector to avoid errors in reward computation later
-        reward_vector = jnp.zeros(3)
-        
-        # Adding reward_vector as part of the state metrics for tracking during training
+
+        # Initialize a 2D reward vector [speed, energy] to be tracked in the state
+        reward_vector = jnp.zeros(2)
+
+        # Add the reward vector to the state's metrics
         state = state.replace(
             metrics={**state.metrics, 'reward_vector': reward_vector}
         )
-        return state  # Returning the updated state
-        
+        return state
+
     def step(self, state: State, action: jnp.ndarray) -> State:
-        # Performing a step using the parent class's step method to update the state
+        # Step the simulation using the base Hopper environment
         state = super().step(state, action)
-        
-        # Extracting forward velocity from the state observation (usually located at index 5)
+
+        # Extract forward velocity from the observation (Hopper-specific index)
         forward_vel = state.obs[5]
-        
-        # Calculating the control cost (action squared sum), encouraging efficiency
-        ctrl_cost = jnp.sum(jnp.square(action))
-        
-        # Adding an alive bonus, incentivizing staying alive in the environment
+
+        # Compute energy penalty: sum of squared actions
+        energy_penalty = jnp.sum(jnp.square(action))
+
+        # Alive bonus to encourage staying upright
         alive_bonus = 1.0
-        
-        # Defining the reward vector: [forward velocity, negative control cost, alive bonus]
-        reward_vector = jnp.array([
-            forward_vel,
-            -ctrl_cost,
-            alive_bonus
-        ])
-        
-        # Scalar reward is computed as a weighted sum of the reward vector components
+
+        # Define PG-MORL paper reward functions:
+        speed_reward = 1.5 * forward_vel + alive_bonus
+        efficiency_reward = -0.0002 * energy_penalty + alive_bonus
+
+        # Create the 2D reward vector [speed, efficiency]
+        reward_vector = jnp.array([speed_reward, efficiency_reward])
+
+        # Apply linear scalarization using weights (default: [1.0, 0.0])
         scalar_reward = jnp.dot(self.weights, reward_vector)
-        
-        # Updating the state with the new reward and reward_vector in metrics for logging
+
+        # Store the reward vector in the state metrics
         updated_metrics = {**state.metrics, 'reward_vector': reward_vector}
-        
+
         return state.replace(
-            reward=scalar_reward,  # Assigning the computed scalar reward
-            metrics=updated_metrics  # Updating metrics with the new reward vector
+            reward=scalar_reward,
+            metrics=updated_metrics
         )
